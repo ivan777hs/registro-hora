@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Registro de horas</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --subtle: #f1f3f6; --text: #1b1f24; --muted: #5d6673;
+    --border: #d8dde3; --accent: #2f6fde; --accent-text: #ffffff; --ok: #1f8a4c; --ok-bg: #e6f5ec;
+    --warn: #9a6200; --warn-bg: #fff4dc; --err: #c62828; --err-bg: #fdecec; --bar: #2f6fde;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121417; --card: #1b1e23; --subtle: #22262c; --text: #e8eaed; --muted: #a0a8b3;
+      --border: #343a42; --accent: #5b93f0; --accent-text: #0d1117; --ok: #5fd18f; --ok-bg: #16301f;
+      --warn: #f0c060; --warn-bg: #33290f; --err: #ff6b6b; --err-bg: #3a1717; --bar: #5b93f0;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 20px 16px 48px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  h2 { font-size: 1.1rem; margin: 0 0 12px; }
+  .sub { color: var(--muted); margin: 0 0 16px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin: 0 0 16px; }
+  .card-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .card-head h2 { margin: 0; }
+  .fila { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
+  .tabs { display: inline-flex; background: var(--subtle); border: 1px solid var(--border); border-radius: 10px; padding: 3px; margin-bottom: 16px; }
+  .tabs button { border: 0; background: transparent; color: var(--text); padding: 7px 16px; border-radius: 8px; font: inherit; cursor: pointer; }
+  .tabs button.activo { background: var(--card); box-shadow: 0 1px 2px rgba(0,0,0,.15); font-weight: 600; }
+  .count { display: inline-block; min-width: 20px; padding: 0 6px; margin-left: 6px; border-radius: 10px; background: var(--border); font-size: .8rem; }
+  button.btn { font: inherit; padding: 7px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--text); cursor: pointer; }
+  button.btn:hover:not(:disabled) { border-color: var(--accent); }
+  button.btn.primario { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+  button.btn:disabled { opacity: .5; cursor: not-allowed; }
+  textarea, input[type=date] { font: inherit; color: var(--text); background: var(--subtle); border: 1px solid var(--border); border-radius: 10px; }
+  textarea { width: 100%; min-height: 300px; padding: 14px; font-family: var(--mono); font-size: 13.5px; line-height: 1.6; resize: vertical; }
+  textarea[readonly] { background: var(--card); color: var(--muted); }
+  textarea.export { min-height: 220px; line-height: 1.5; }
+  input[type=date] { padding: 7px 10px; }
+  .metricas { display: flex; flex-wrap: wrap; gap: 12px; }
+  .metrica { flex: 1 1 140px; background: var(--subtle); border-radius: 10px; padding: 12px 14px; }
+  .metrica .v { font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .metrica .l { color: var(--muted); font-size: .85rem; }
+  .metrica.ok .v { color: var(--ok); }
+  .barra { display: grid; grid-template-columns: minmax(90px, 200px) 1fr 52px; gap: 10px; align-items: center; margin: 6px 0; }
+  .barra .n { overflow-wrap: anywhere; }
+  .barra .t { height: 12px; background: var(--subtle); border-radius: 6px; overflow: hidden; }
+  .barra .t div { height: 100%; background: var(--bar); border-radius: 6px; }
+  .barra .d { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: .85rem; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .aviso { border-radius: 10px; padding: 10px 14px; margin: 10px 0; }
+  .aviso.ok { background: var(--ok-bg); color: var(--ok); }
+  .aviso.warn { background: var(--warn-bg); color: var(--warn); }
+  .aviso.err { background: var(--err-bg); color: var(--err); font-weight: 600; border: 1px solid var(--err); }
+  .estado { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: .8rem; background: var(--subtle); color: var(--muted); }
+  .estado.ok { background: var(--ok-bg); color: var(--ok); }
+  .guardado { color: var(--muted); font-size: .85rem; margin: 6px 0; }
+  .ayuda { color: var(--muted); font-size: .9rem; }
+  code { font-family: var(--mono); background: var(--subtle); padding: 0 4px; border-radius: 4px; }
+  .oculto { display: none !important; }
+  @media (max-width: 600px) {
+    main { padding: 12px 10px 40px; }
+    .barra { grid-template-columns: 1fr 52px; }
+    .barra .t { grid-column: 1 / -1; grid-row: 2; }
+    table.dias thead { display: none; }
+    table.dias tr { display: flex; flex-wrap: wrap; gap: 4px 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+    table.dias td { border: 0; padding: 2px 0; }
+    table.dias td.proy { flex-basis: 100%; color: var(--muted); font-size: .9rem; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Registro de horas</h1>
+  <p class="sub">Captura tus actividades en Hoy, ve cuánto llevas y cuánto te falta, y al cerrar el día se guarda en Historial.</p>
+  <div id="errorGuardado" class="aviso err oculto" role="alert"></div>
+
+  <div class="tabs" role="tablist">
+    <button id="tabHoy" class="activo" role="tab">Hoy</button>
+    <button id="tabHist" role="tab">Historial <span id="cuentaDias" class="count">0</span></button>
+  </div>
+
+  <!-- HOY -->
+  <section id="vistaHoy">
+    <div class="card">
+      <h2 id="tituloHoy">Hoy</h2>
+      <div id="msgCerrado" class="aviso ok oculto"></div>
+      <textarea id="txtHoy" spellcheck="false" placeholder="*PROYECTO*&#10;01:00 - descripción&#10;SUBGRUPO&#10;00:30 - descripción"></textarea>
+      <div id="guardadoHoy" class="guardado">Último guardado: —</div>
+      <div id="avisoCerrar" class="oculto">
+        <div id="avisoCerrarTxt" class="aviso warn"></div>
+        <div class="fila">
+          <button id="btnReemplazar" class="btn primario">Reemplazar lo guardado</button>
+          <button id="btnSumar" class="btn">Sumar</button>
+          <button id="btnCancelar" class="btn">Cancelar</button>
+        </div>
+      </div>
+      <div id="filaCerrar" class="fila"><button id="btnCerrarHoy" class="btn primario">Cerrar día</button></div>
+      <p class="ayuda">Usa <code>*PROYECTO*</code> para empezar un proyecto, <code>HH:MM - descripción</code> para cada tiempo y una línea sin hora (como <code>USUARIOS</code>) para subgrupos. Lo que escribes se guarda mientras capturas; al cerrar el día pasa a Historial con la fecha de hoy y este cuadro queda limpio.</p>
+    </div>
+    <div id="resumenHoy"></div>
+  </section>
+
+  <!-- HISTORIAL: lista -->
+  <section id="vistaHist" class="oculto">
+    <div class="card">
+      <h2>Agregar un día pasado</h2>
+      <div class="fila">
+        <input type="date" id="nuevaFecha">
+        <button id="btnAgregar" class="btn primario" disabled>Agregar día</button>
+      </div>
+    </div>
+    <div class="card" id="cardExport">
+      <h2>Exportar</h2>
+      <div class="fila">
+        <button id="btnDescargar" class="btn primario">Descargar historial</button>
+        <button id="btnCopiar" class="btn">Copiar historial</button>
+      </div>
+      <textarea id="txtExport" class="export oculto" readonly></textarea>
+      <p class="ayuda">El archivo trae cada día cerrado con su fecha, total, desglose por proyecto y subgrupo y las líneas originales. Si el navegador no deja descargar, usa Copiar historial.</p>
+    </div>
+    <div class="card">
+      <h2>Días registrados</h2>
+      <table class="dias">
+        <thead><tr><th>Día</th><th class="num">Total</th><th>Proyectos</th><th>Estado</th><th></th></tr></thead>
+        <tbody id="tablaDias"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- HISTORIAL: día abierto -->
+  <section id="vistaDia" class="oculto">
+    <div class="card">
+      <div class="card-head"><h2 id="tituloDia"></h2><button id="btnVolver" class="btn">Todos los días</button></div>
+      <textarea id="txtDia" spellcheck="false" placeholder="*PROYECTO*&#10;01:00 - descripción&#10;SUBGRUPO&#10;00:30 - descripción"></textarea>
+      <div id="guardadoDia" class="guardado">Último guardado: —</div>
+      <div class="fila" id="filaDia"></div>
+    </div>
+    <div id="resumenDia"></div>
+  </section>
+</main>
+
+<script>
+"use strict";
+const HOY_INICIAL = {
+  fecha: "2026-10-23",
+  texto: `*MIDM*
+00:10 - Tickets
+01:00 - Llamada interna con Mau
+
+*Oxford* 00:10 - Revision de reporte de dos alumnos
+
+*RIO GARAGE* 01:00 - Llamada de seguimiento
+
+*BTM*
+01:00 - 86e3uhkrc TERMINADO
+
+USUARIOS
+01:00 - 86e3uhkv7 TERMINADO
+00:30 - 86e3uhm4r TERMINADO
+00:30 - 86e3uhm8n TERMINADO
+GIROS
+01:00 - 86e3uhmz5 TERMINADO
+01:00 - 86e3uhn1j TERMINADO
+00:30 - 86e3uhnek TERMINADO
+00:10 - 86e3uhngd TERMINADO`,
+};
+
+const DIAS = [
+  {
+    fecha: "2026-10-22",
+    cerrado: true,
+    texto: `*MIDM*
+00:10 - Tickets
+01:00 - Llamada con Mau
+01:00 - Llamada con Paco para unificar el proceso de actualizaciones
+01:10 - Parche de Seguridad Oxford LIFE/CONALEP
+00:20 - Parche de Seguridad Pacific Rio Garage
+00:30 - Parche de Seguridad Cirtec
+00:30 - Parche de Seguridad Pacific APP
+00:30 - Parche de Seguridad Pacific API
+00:20 - Llamada y detalles que implica la actualizacion en php docker y servidor directo
+
+*Oxford*
+00:50 - Revisión de multiples puntos de Oxford
+
+*Del Río Garage*
+00:40 - 86e3nncfz EN PROCESO
+
+*Cirtec*
+01:00 - Llamada con Gerardo`,
+  },
+  {
+    fecha: "2026-10-21",
+    cerrado: true,
+    texto: `*MIDM*
+00:10 - Tickets
+00:40 - Llamada con Mau
+00:20 - Llamada interna
+
+*SICORENT*
+00:10 - Revisar exportable de ordenes de ruta
+00:15 - Revisar caida de servicio
+
+*Oxford*
+01:30 - 86e3u1ct4 TERMINADO
+00:20 - Descargar y enviar zip de grupos
+00:05 - Reivisar alumno con confusión de informacion
+
+*Cirtec*
+01:00 - 86e3pyy6v TERMINADO
+
+*Del Río Motors*
+00:30 - 86e36uchy EN PROCESO
+
+*BTM*
+00:30 - 86e3uhg9r TERMINADO
+01:00 - 86e3uhgba EN PROGRESO
+01:00 - 86e3uhg7g TERMINADO
+00:30 - 86e3uhkrc EN PROGRESO`,
+  },
+  {
+    fecha: "2026-10-20",
+    cerrado: true,
+    texto: `*MIDM*
+00:10 - Tickets
+02:00 - CAPACITACION
+
+*Oxford*
+01:30 - 86e3u1cmp TERMINADO
+00:20 - Revisión de error en filtro de fechas
+01:00 - 86e3u1ct4 EN PROCESO
+
+*Del Río Motors*
+00:45 - Llamada revisión de pendientes
+00:15 - 86e3u1zbv
+
+*BTM*
+02:00 - 86e3tf8ck TERMINADO`,
+  },
+  {
+    fecha: "2026-10-19",
+    cerrado: true,
+    texto: `*MIDM*
+00:10 - Tickets
+01:00 - Llamada con Mau
+01:00 - Llamada con Paco para unificar el proceso de actualizaciones
+01:10 - Parche de Seguridad Oxford LIFE/CONALEP
+00:20 - Parche de Seguridad Pacific Rio Garage
+00:30 - Parche de Seguridad Cirtec
+00:30 - Parche de Seguridad Pacific APP
+00:30 - Parche de Seguridad Pacific API
+00:20 - Llamada y detalles que implica la actualizacion en php docker y servidor directo
+
+*Oxford*
+00:50 - Revisión de multiples puntos de Oxford
+
+*Del Río Garage*
+00:40 - 86e3nncfz EN PROCESO
+
+*Cirtec*
+01:00 - Llamada con Gerardo`,
+  },
+];
+
+var META = 480;
+var KEY_HOY = "registro-horas-html-hoy";
+var KEY_DIAS = "registro-horas-html-dias";
+var DIAS_SEM = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+var MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+function fmt(min) {
+  var h = Math.floor(min / 60), m = min % 60;
+  return h + ":" + String(m).padStart(2, "0");
+}
+function hoyCDMX() {
+  try { return new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" }); }
+  catch (e) {
+    var d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+}
+function horaCDMX() {
+  try { return new Date().toLocaleTimeString("en-GB", { timeZone: "America/Mexico_City", hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" }); }
+  catch (e) { return new Date().toTimeString().slice(0, 8); }
+}
+// "Viernes 23 oct 2026"
+function etiqueta(fecha) {
+  var p = fecha.split("-").map(function (x) { return parseInt(x, 10); });
+  var dt = new Date(Date.UTC(p[0], p[1] - 1, p[2], 12));
+  return DIAS_SEM[dt.getUTCDay()] + " " + p[2] + " " + MESES[p[1] - 1] + " " + p[0];
+}
+function parse(src) {
+  var out = [], proyecto = "Sin proyecto", grupo = "";
+  var lineas = String(src).split("\n");
+  for (var i = 0; i < lineas.length; i++) {
+    var line = lineas[i].trim();
+    if (!line) continue;
+    var p = line.match(/^\*([^*]+)\*\s*(.*)$/);
+    if (p) {
+      proyecto = p[1].trim(); grupo = ""; line = p[2].trim();
+      if (!line) continue;
+    }
+    var t = line.match(/^(\d{1,2}):(\d{2})\s*[-–]?\s*(.*)$/);
+    if (t) out.push({ proyecto: proyecto, grupo: grupo, minutos: parseInt(t[1], 10) * 60 + parseInt(t[2], 10), texto: t[3] });
+    else grupo = line;
+  }
+  return out;
+}
+function suma(en) { return en.reduce(function (s, e) { return s + e.minutos; }, 0); }
+function totalDe(src) { return suma(parse(src)); }
+function agrupar(entradas, clave) {
+  var m = new Map();
+  entradas.forEach(function (e) { var k = clave(e); if (!k) return; m.set(k, (m.get(k) || 0) + e.minutos); });
+  return Array.from(m.entries()).sort(function (a, b) { return b[1] - a[1]; });
+}
+var porProy = function (e) { return e.proyecto; };
+var porGrupo = function (e) { return e.grupo ? e.proyecto + " · " + e.grupo : ""; };
+
+/* ---------- Estado y persistencia ---------- */
+var HOY = hoyCDMX();
+var dias = {};        // { fecha: { texto, cerrado } }
+var borrador = "";
+var errorGuardar = "";
+
+function mostrarError() {
+  var el = document.getElementById("errorGuardado");
+  if (errorGuardar) { el.textContent = errorGuardar; el.classList.remove("oculto"); }
+  else el.classList.add("oculto");
+}
+function marcarGuardado() {
+  var txt = "Último guardado: " + horaCDMX() + " (hora CDMX)";
+  document.getElementById("guardadoHoy").textContent = txt;
+  document.getElementById("guardadoDia").textContent = txt;
+}
+function guardar() {
+  try {
+    window.localStorage.setItem(KEY_HOY, borrador);
+    window.localStorage.setItem(KEY_DIAS, JSON.stringify(dias));
+    errorGuardar = "";
+    marcarGuardado();
+  } catch (e) {
+    errorGuardar = "⚠ No se pudo guardar en este navegador (localStorage falló: " + (e && e.name ? e.name : String(e)) + "). Lo que escribas se puede perder al cerrar. Usa Copiar historial o Descargar historial para respaldar.";
+  }
+  mostrarError();
+}
+function cargar() {
+  var guardados = {}, hoyGuardado = null;
+  try {
+    hoyGuardado = window.localStorage.getItem(KEY_HOY);
+    var raw = window.localStorage.getItem(KEY_DIAS);
+    if (raw) guardados = JSON.parse(raw) || {};
+    // prueba de escritura
+    window.localStorage.setItem("registro-horas-html-prueba", "1");
+    window.localStorage.removeItem("registro-horas-html-prueba");
+  } catch (e) {
+    errorGuardar = "⚠ Este navegador no deja guardar datos (localStorage falló: " + (e && e.name ? e.name : String(e)) + "). Lo que escribas se perderá al cerrar. Usa Copiar historial o Descargar historial para respaldar.";
+  }
+  // Los días incluidos van por debajo; lo guardado gana.
+  dias = {};
+  DIAS.forEach(function (d) { dias[d.fecha] = { texto: d.texto, cerrado: !!d.cerrado }; });
+  Object.keys(guardados).forEach(function (f) {
+    var g = guardados[f];
+    if (g && typeof g.texto === "string" && /^\d{4}-\d{2}-\d{2}$/.test(f)) dias[f] = { texto: g.texto, cerrado: !!g.cerrado };
+  });
+  borrador = hoyGuardado !== null ? hoyGuardado : (HOY === HOY_INICIAL.fecha ? HOY_INICIAL.texto : "");
+  mostrarError();
+}
+
+/* ---------- Vista ---------- */
+var vista = "hoy", abierto = "", aviso = false, cerradoMsg = "";
+function $(id) { return document.getElementById(id); }
+function el(tag, attrs, hijos) {
+  var n = document.createElement(tag);
+  if (attrs) Object.keys(attrs).forEach(function (k) {
+    if (k === "text") n.textContent = attrs[k];
+    else if (k === "class") n.className = attrs[k];
+    else if (k.slice(0, 2) === "on") n.addEventListener(k.slice(2), attrs[k]);
+    else n.setAttribute(k, attrs[k]);
+  });
+  (hijos || []).forEach(function (h) { if (h) n.appendChild(h); });
+  return n;
+}
+function seccion(titulo, contenido) { return el("div", { class: "card" }, [el("h2", { text: titulo })].concat(contenido)); }
+
+function resumen(cont, texto) {
+  cont.innerHTML = "";
+  var en = parse(texto), total = suma(en);
+  if (total === 0 && en.length === 0) return;
+  var faltan = Math.max(0, META - total), extra = Math.max(0, total - META);
+  var m2 = extra > 0 ? { v: "+" + fmt(extra), l: "Arriba de 8:00", ok: true } : { v: fmt(faltan), l: "Faltan para 8:00", ok: faltan === 0 };
+  var mets = [{ v: fmt(total), l: "Total", id: "mTotal" }, { v: m2.v, l: m2.l, ok: m2.ok, id: "mFaltan" }, { v: String(en.length), l: "Registros" }];
+  cont.appendChild(seccion("Total del día", [el("div", { class: "metricas" }, mets.map(function (m) {
+    var a = { class: "metrica" + (m.ok ? " ok" : "") }; if (m.id) a["data-m"] = m.id;
+    return el("div", a, [el("div", { class: "v", text: m.v }), el("div", { class: "l", text: m.l })]);
+  }))]));
+  var pp = agrupar(en, porProy);
+  if (pp.length) {
+    var max = pp[0][1] || 1;
+    cont.appendChild(seccion("Por proyecto", pp.map(function (x) {
+      var fill = el("div"); fill.style.width = (x[1] / max * 100).toFixed(1) + "%";
+      return el("div", { class: "barra", "data-proyecto": x[0] }, [el("div", { class: "n", text: x[0] }), el("div", { class: "t" }, [fill]), el("div", { class: "d", text: fmt(x[1]) })]);
+    })));
+  }
+  var pg = agrupar(en, porGrupo);
+  if (pg.length) {
+    cont.appendChild(seccion("Por subgrupo", [el("table", null, [
+      el("thead", null, [el("tr", null, [el("th", { text: "Subgrupo" }), el("th", { class: "num", text: "Tiempo" })])]),
+      el("tbody", null, pg.map(function (x) { return el("tr", { "data-grupo": x[0] }, [el("td", { text: x[0] }), el("td", { class: "num", text: fmt(x[1]) })]); }))
+    ])]));
+  }
+}
+
+function ordenados() {
+  return Object.keys(dias).map(function (f) { return { fecha: f, texto: dias[f].texto, cerrado: dias[f].cerrado }; })
+    .filter(function (d) { return d.texto.trim() !== "" || d.fecha === abierto; })
+    .sort(function (a, b) { return a.fecha < b.fecha ? 1 : -1; });
+}
+
+function exportar() {
+  var cerrados = ordenados().filter(function (d) { return d.cerrado; });
+  var partes = ["REGISTRO DE HORAS · descargado " + HOY, "Días cerrados: " + cerrados.length, ""];
+  cerrados.forEach(function (d) {
+    var en = parse(d.texto);
+    partes.push("=== " + d.fecha + " (" + etiqueta(d.fecha) + ") · Total " + fmt(suma(en)) + " ===");
+    partes.push("Por proyecto:");
+    agrupar(en, porProy).forEach(function (x) { partes.push("- " + x[0] + ": " + fmt(x[1])); });
+    var gs = agrupar(en, porGrupo);
+    if (gs.length > 0) {
+      partes.push("Por subgrupo:");
+      gs.forEach(function (x) { partes.push("- " + x[0] + ": " + fmt(x[1])); });
+    }
+    partes.push("Líneas originales:");
+    partes.push(d.texto.trim());
+    partes.push("");
+  });
+  return partes.join("\n");
+}
+
+function existenteTotal() { return dias[HOY] ? totalDe(dias[HOY].texto) : 0; }
+
+function pintarHoy() {
+  $("tituloHoy").textContent = "Hoy · " + etiqueta(HOY);
+  var bt = totalDe(borrador), et = existenteTotal();
+  $("btnCerrarHoy").disabled = bt === 0;
+  var m = $("msgCerrado");
+  if (cerradoMsg && !borrador) { m.textContent = cerradoMsg; m.classList.remove("oculto"); } else m.classList.add("oculto");
+  $("avisoCerrar").classList.toggle("oculto", !aviso);
+  $("filaCerrar").classList.toggle("oculto", aviso);
+  if (aviso) {
+    $("avisoCerrarTxt").textContent = etiqueta(HOY) + " ya tiene " + fmt(et) + " guardadas en Historial. ¿Qué hago con estos " + fmt(bt) + "?";
+    $("btnSumar").textContent = "Sumar (" + fmt(et + bt) + " en total)";
+  }
+  resumen($("resumenHoy"), borrador);
+}
+
+function pintarLista() {
+  var lista = ordenados();
+  $("cuentaDias").textContent = String(lista.length);
+  $("nuevaFecha").max = HOY;
+  $("cardExport").classList.toggle("oculto", !lista.some(function (d) { return d.cerrado; }));
+  if (!$("txtExport").classList.contains("oculto")) $("txtExport").value = exportar();
+  var tb = $("tablaDias"); tb.innerHTML = "";
+  lista.forEach(function (d) {
+    var en = parse(d.texto);
+    var ps = agrupar(en, porProy).map(function (x) { return x[0] + " " + fmt(x[1]); }).join(", ");
+    tb.appendChild(el("tr", { "data-fecha": d.fecha }, [
+      el("td", { text: d.fecha === HOY ? etiqueta(d.fecha) + " (hoy)" : etiqueta(d.fecha) }),
+      el("td", { class: "num total", text: fmt(suma(en)) }),
+      el("td", { class: "proy", text: ps }),
+      el("td", null, [el("span", { class: "estado" + (d.cerrado ? " ok" : ""), text: d.cerrado ? "Cerrado" : "Abierto" })]),
+      el("td", { class: "num" }, [el("button", { class: "btn", text: "Abrir", onclick: function () { abrirDia(d.fecha); } })])
+    ]));
+  });
+}
+
+function pintarDia() {
+  var d = dias[abierto] || { texto: "", cerrado: false };
+  $("tituloDia").textContent = etiqueta(abierto);
+  var ta = $("txtDia");
+  if (ta.value !== d.texto) ta.value = d.texto;
+  ta.readOnly = d.cerrado;
+  var fila = $("filaDia"); fila.innerHTML = "";
+  if (d.cerrado) {
+    fila.appendChild(el("span", { class: "estado ok", text: "Día cerrado" }));
+    fila.appendChild(el("button", { class: "btn", id: "btnReabrir", text: "Reabrir para editar", onclick: function () {
+      dias[abierto] = { texto: d.texto, cerrado: false }; guardar(); pintar();
+    } }));
+  } else {
+    var b = el("button", { class: "btn primario", id: "btnCerrarDia", text: "Cerrar día", onclick: function () {
+      dias[abierto] = { texto: (dias[abierto] || d).texto, cerrado: true }; guardar(); pintar();
+    } });
+    b.disabled = totalDe(d.texto) === 0;
+    fila.appendChild(b);
+  }
+  resumen($("resumenDia"), d.texto);
+}
+
+function pintar() {
+  $("tabHoy").classList.toggle("activo", vista === "hoy");
+  $("tabHist").classList.toggle("activo", vista === "historial");
+  $("vistaHoy").classList.toggle("oculto", vista !== "hoy");
+  $("vistaHist").classList.toggle("oculto", !(vista === "historial" && !abierto));
+  $("vistaDia").classList.toggle("oculto", !(vista === "historial" && abierto));
+  $("cuentaDias").textContent = String(ordenados().length);
+  if (vista === "hoy") pintarHoy();
+  else if (!abierto) pintarLista();
+  else pintarDia();
+}
+
+function abrirDia(f) { vista = "historial"; abierto = f; pintar(); window.scrollTo(0, 0); }
+
+function cerrarHoy(modo) {
+  var previo = dias[HOY] ? dias[HOY].texto.trim() : "";
+  var texto = modo === "sumar" && previo ? previo + "\n\n" + borrador.trim() : borrador.trim();
+  dias[HOY] = { texto: texto, cerrado: true };
+  borrador = ""; $("txtHoy").value = "";
+  aviso = false;
+  cerradoMsg = etiqueta(HOY) + " quedó cerrado con " + fmt(totalDe(texto)) + " y ya está en Historial.";
+  guardar(); pintar();
+}
+
+function copiarTexto(txt) {
+  var ta = $("txtExport");
+  var respaldo = function () {
+    ta.focus(); ta.select();
+    try { if (document.execCommand("copy")) $("btnCopiar").textContent = "Copiado"; } catch (e) {}
+  };
+  try {
+    navigator.clipboard.writeText(txt).then(function () { $("btnCopiar").textContent = "Copiado"; }, function () { setTimeout(respaldo, 50); });
+  } catch (e) { setTimeout(respaldo, 50); }
+}
+
+/* ---------- Eventos ---------- */
+document.addEventListener("DOMContentLoaded", function () {
+  cargar();
+  $("txtHoy").value = borrador;
+
+  $("tabHoy").addEventListener("click", function () { vista = "hoy"; abierto = ""; aviso = false; pintar(); });
+  $("tabHist").addEventListener("click", function () { vista = "historial"; abierto = ""; aviso = false; pintar(); });
+
+  $("txtHoy").addEventListener("input", function (e) {
+    borrador = e.target.value; aviso = false; cerradoMsg = "";
+    guardar(); pintarHoy();
+  });
+  $("txtDia").addEventListener("input", function (e) {
+    if (!abierto || (dias[abierto] && dias[abierto].cerrado)) return;
+    dias[abierto] = { texto: e.target.value, cerrado: false };
+    guardar(); pintarDia();
+  });
+
+  $("btnCerrarHoy").addEventListener("click", function () {
+    if (totalDe(borrador) === 0) return;
+    if (dias[HOY] && existenteTotal() > 0) { aviso = true; pintarHoy(); }
+    else cerrarHoy("nuevo");
+  });
+  $("btnReemplazar").addEventListener("click", function () { cerrarHoy("reemplazar"); });
+  $("btnSumar").addEventListener("click", function () { cerrarHoy("sumar"); });
+  $("btnCancelar").addEventListener("click", function () { aviso = false; pintarHoy(); });
+
+  $("nuevaFecha").addEventListener("input", function (e) { $("btnAgregar").disabled = !e.target.value; });
+  $("btnAgregar").addEventListener("click", function () {
+    var f = $("nuevaFecha").value;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) return;
+    if (!dias[f]) { dias[f] = { texto: "", cerrado: false }; guardar(); }
+    $("nuevaFecha").value = ""; $("btnAgregar").disabled = true;
+    abrirDia(f);
+  });
+  $("btnVolver").addEventListener("click", function () { abierto = ""; pintar(); });
+
+  $("btnDescargar").addEventListener("click", function () {
+    var contenido = exportar();
+    var ta = $("txtExport"); ta.value = contenido; ta.classList.remove("oculto");
+    try {
+      var blob = new Blob([contenido], { type: "text/plain;charset=utf-8" });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url; a.download = "registro-horas-" + HOY + ".txt"; a.rel = "noopener"; a.style.display = "none";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+    } catch (e) { /* descarga bloqueada; queda el texto visible */ }
+  });
+  $("btnCopiar").addEventListener("click", function () {
+    var txt = exportar();
+    var ta = $("txtExport"); ta.value = txt; ta.classList.remove("oculto");
+    copiarTexto(txt);
+  });
+
+  document.addEventListener("visibilitychange", function () { if (document.visibilityState === "hidden") guardar(); });
+  window.addEventListener("pagehide", guardar);
+
+  pintar();
+});
+</script>
+</body>
+</html>
